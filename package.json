@@ -1,35 +1,16 @@
 {
-  "name": "boundary-delineation-dashboard",
+  "name": "boundary-delineation-app",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "@ngageoint/geopackage": "^4.2.6",
-    "@turf/bbox": "^7.3.1",
-    "@types/leaflet-draw": "^1.0.13",
-    "clsx": "^2.1.1",
-    "leaflet": "^1.9.4",
-    "leaflet-draw": "^1.0.4",
-    "lucide-react": "^0.555.0",
-    "next": "14.2.0",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "react-leaflet": "4.2.1"
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && PYTHONPATH=/home/kambing/Delineate-Anything python main.py",
+    "build:frontend": "cd frontend && npm run build",
+    "start:frontend": "cd frontend && npm start",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && pip install -r requirements.txt"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/leaflet": "^1.9.21",
-    "@types/node": "^20",
-    "@types/react": "18.3.27",
-    "@types/react-dom": "18.3.7",
-    "eslint": "8.57.1",
-    "eslint-config-next": "14.2.0",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "concurrently": "^8.0.0"
   }
 }

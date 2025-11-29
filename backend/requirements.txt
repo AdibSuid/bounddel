@@ -1,0 +1,31 @@
+fastapi
+uvicorn
+pydantic
+huggingface_hub>=0.24.0        # Model weights download for Delineate-Anything
+sentinelhub>=3.11.0           # Satellite data API
+geopandas>=1.1.1              # Geospatial dataframes
+fiona>=1.10.0                 # Geospatial I/O (required by geopandas)
+pyogrio>=0.7.2                # Fast geospatial I/O
+shapely>=2.1.0                # Geometry operations
+matplotlib>=3.8.0             # Plotting (if used)
+rasterio>=1.4.0               # GeoTIFF I/O
+opencv-python>=4.12.0         # Video/image processing
+numpy>=2.2.0                  # Array operations
+tqdm>=4.67.0                  # Progress bars
+geopy>=2.4.1                  # Geocoding (country lookup)
+torch>=2.9.0                  # PyTorch (ML pipeline)
+torchvision>=0.24.0           # PyTorch vision (ML pipeline)
+Pillow>=12.0.0                # Image I/O (ML pipeline)
+scikit-learn>=1.7.0
+pandas>=2.3.0
+scikit-image>=0.25.0
+networkx>=3.4.0
+joblib>=1.5.0
+scipy>=1.15.0
+imageio>=2.37.0
+
+# Note: GDAL is required by Delineate-Anything. Install via Conda:
+# conda install -c conda-forge gdal
+
+# Optional: for Jupyter/interactive work
+jupyterlab>=4.0.0

@@ -1,0 +1,41 @@
+{
+  "name": "boundary-delineation-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "geotiff": "^2.1.1",
+    "georaster-layer-for-leaflet": "^3.5.2",
+    "georaster": "1.6.1",
+    "@hello-pangea/dnd": "^18.0.1",
+    "@ngageoint/geopackage": "^4.2.6",
+    "@turf/bbox": "^7.3.1",
+    "@types/leaflet-draw": "^1.0.13",
+    "@types/react-beautiful-dnd": "^13.1.8",
+    "clsx": "^2.1.1",
+    "leaflet": "^1.9.4",
+    "leaflet-draw": "^1.0.4",
+    "lucide-react": "^0.555.0",
+    "next": "14.2.0",
+    "react": "18.3.1",
+    "react-beautiful-dnd": "^13.1.1",
+    "react-dom": "18.3.1",
+    "react-leaflet": "4.2.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/leaflet": "^1.9.21",
+    "@types/node": "^20",
+    "@types/react": "18.3.27",
+    "@types/react-dom": "18.3.7",
+    "eslint": "8.57.1",
+    "eslint-config-next": "14.2.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
