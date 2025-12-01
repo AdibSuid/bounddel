@@ -1,0 +1,54 @@
+# Combined Dockerfile - Frontend + Backend in one container
+FROM python:3.10-slim
+
+# Install system dependencies for both Python and Node.js
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    libgdal-dev \
+    libspatialindex-dev \
+    supervisor \
+    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy and setup backend
+COPY Delineate-Anything /app/Delineate-Anything
+COPY backend /app/backend
+
+# Install Python dependencies
+WORKDIR /app/backend
+
+# Install Delineate-Anything dependencies
+RUN pip install --no-cache-dir -r /app/Delineate-Anything/requirements.txt
+
+# Install backend dependencies
+RUN pip install --no-cache-dir \
+    fastapi \
+    uvicorn[standard] \
+    pydantic \
+    geopandas \
+    pillow
+
+# Copy and setup frontend
+WORKDIR /app
+COPY frontend /app/frontend
+
+# Install Node.js dependencies and build
+WORKDIR /app/frontend
+RUN npm ci && npm run build
+
+# Setup supervisor to run both services
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Expose both ports
+EXPOSE 3000 8000
+
+# Set environment variables
+ENV PYTHONPATH=/app/Delineate-Anything
+ENV NODE_ENV=production
+
+# Start supervisor which will run both services
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

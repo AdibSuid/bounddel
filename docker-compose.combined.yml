@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  bounddel:
+    image: adibsuid/bounddel:latest
+    # Uncomment to build locally
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.combined
+    container_name: bounddel-app
+    ports:
+      - "3000:3000"  # Frontend
+      - "8000:8000"  # Backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/", "&&", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

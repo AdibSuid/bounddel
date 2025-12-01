@@ -19,8 +19,6 @@ export default function Home() {
   const [isResizing, setIsResizing] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedFeatureBounds, setSelectedFeatureBounds] = useState<[[number, number], [number, number]] | null>(null);
-  const [drawingMode, setDrawingMode] = useState<DrawingMode>('none');
-  const [boundingBoxes, setBoundingBoxes] = useState<BoundingBox[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
 
@@ -64,117 +62,88 @@ export default function Home() {
     setLayers(reorderedLayers);
   };
 
-  const handleToggleDrawing = () => {
-    setDrawingMode(prev => prev === 'rectangle' ? 'none' : 'rectangle');
-  };
-
-  const handleBoundingBoxCreated = (bounds: [[number, number], [number, number]]) => {
-    // Validate bounding box
-    const validation = validateBBox(bounds);
-    if (!validation.valid) {
-      alert(validation.error);
+  const handleGenerateBoundaries = async (modelId: string, layerId: string) => {
+    const selectedRaster = layers.find(l => l.id === layerId && l.type === 'raster');
+    
+    if (!selectedRaster || !selectedRaster.rasterBounds || !selectedRaster.rasterUrl) {
+      alert('Selected image is invalid or missing data.');
       return;
     }
 
-    const newBbox: BoundingBox = {
-      id: `bbox-${Date.now()}`,
-      bounds,
-      status: 'pending',
-      createdAt: new Date()
-    };
+    console.log('=== GENERATE BOUNDARIES DEBUG ===');
+    console.log('Selected Raster:', selectedRaster.name);
+    console.log('Raster Bounds:', JSON.stringify(selectedRaster.rasterBounds));
+    console.log('Bounds format: [[south, west], [north, east]]');
+    console.log('South:', selectedRaster.rasterBounds[0][0]);
+    console.log('West:', selectedRaster.rasterBounds[0][1]);
+    console.log('North:', selectedRaster.rasterBounds[1][0]);
+    console.log('East:', selectedRaster.rasterBounds[1][1]);
+    console.log('Image Data URL length:', selectedRaster.rasterUrl.length);
+    console.log('Model ID:', modelId);
+    console.log('Description:', selectedRaster.description);
 
-    setBoundingBoxes(prev => [...prev, newBbox]);
-    setDrawingMode('none'); // Exit drawing mode after creating bbox
-  };
+    // Validate bounds are reasonable geographic coordinates
+    const south = selectedRaster.rasterBounds[0][0];
+    const west = selectedRaster.rasterBounds[0][1];
+    const north = selectedRaster.rasterBounds[1][0];
+    const east = selectedRaster.rasterBounds[1][1];
 
-  const handleDeleteBoundingBox = (id: string) => {
-    setBoundingBoxes(prev => prev.filter(b => b.id !== id));
-  };
-
-  const handleGenerateBoundaries = async (modelId: string) => {
-    const pendingBoxes = boundingBoxes.filter(b => b.status === 'pending');
-    const topVisibleRaster = layers.find(l => l.type === 'raster' && l.visible);
-    // If no bbox drawn, fall back to visible raster's full bounds
-    const boxesToProcess = pendingBoxes.length > 0
-      ? pendingBoxes
-      : (topVisibleRaster?.rasterBounds ? [{
-            id: `bbox-auto-${Date.now()}`,
-            bounds: topVisibleRaster.rasterBounds,
-            status: 'pending' as const,
-            createdAt: new Date(),
-            modelId: modelId
-        } as BoundingBox] : []);
-    if (boxesToProcess.length === 0) {
-      alert('No bounding box and no visible raster bounds found. Please show a raster layer.');
+    if (south < -90 || south > 90 || north < -90 || north > 90 || 
+        west < -180 || west > 180 || east < -180 || east > 180) {
+      alert(`Invalid bounds detected!\nSouth: ${south}\nWest: ${west}\nNorth: ${north}\nEast: ${east}\n\nThese don't look like valid geographic coordinates.`);
+      setIsGenerating(false);
       return;
     }
 
-    if (!topVisibleRaster) {
-      alert('Please make a raster layer visible before generating boundaries.');
+    if (south >= north || west >= east) {
+      alert(`Invalid bounds order!\nSouth (${south}) must be < North (${north})\nWest (${west}) must be < East (${east})`);
+      setIsGenerating(false);
       return;
     }
 
     setIsGenerating(true);
 
-    for (const boundingBox of boxesToProcess) {
-      try {
-        // Update status to processing
-        setBoundingBoxes(prev => prev.map(b =>
-          b.id === boundingBox.id ? { ...b, status: 'processing' as const, modelId } : b
-        ));
+    try {
+      // Call DelineateAnything model with the full raster bounds
+      const result = await delineateFields({
+        bbox: selectedRaster.rasterBounds,
+        modelVersion: modelId,
+        modelId,
+        imageData: selectedRaster.rasterUrl
+      });
 
-        // Determine top-most visible raster (if any) and pass as imageData
-        // Call DelineateAnything model with selected model and optional raster image
-        const result = await delineateFields({
-          bbox: boundingBox.bounds,
-          modelVersion: modelId,
-          modelId,
-          imageData: topVisibleRaster?.rasterUrl
-        });
-
-        // Extract features from result
-        const featureMetadata = result.boundaries.features.map((feature: any, idx: number) => {
-          const featureBbox = bbox(feature);
-          return {
-            id: `${boundingBox.id}-feature-${idx}`,
-            name: feature.properties?.name || feature.properties?.id || `Field ${idx + 1}`,
-            bounds: [[featureBbox[1], featureBbox[0]], [featureBbox[3], featureBbox[2]]] as [[number, number], [number, number]]
-          };
-        });
-
-        // Create new layer from delineation result
-        const confidence = (result.metadata.confidence ?? 0.9);
-        const newLayer: Layer = {
-          id: `delineated-${Date.now()}`,
-          name: `${modelId} - ${new Date().toLocaleTimeString()}`,
-          type: 'vector',
-          data: result.boundaries,
-          visible: true,
-          color: '#ef4444', // Red for delineated layers
-          description: `Generated ${result.metadata.fieldCount} field boundaries (${result.metadata.processingTime}ms, ${(confidence * 100).toFixed(1)}% confidence)`,
-          features: featureMetadata
+      // Extract features from result
+      const featureMetadata = result.boundaries.features.map((feature: any, idx: number) => {
+        const featureBbox = bbox(feature);
+        return {
+          id: `delineated-feature-${idx}`,
+          name: feature.properties?.name || feature.properties?.id || `Field ${idx + 1}`,
+          bounds: [[featureBbox[1], featureBbox[0]], [featureBbox[3], featureBbox[2]]] as [[number, number], [number, number]]
         };
+      });
 
-        setLayers(prev => [newLayer, ...prev]);
+      // Create new layer from delineation result
+      const confidence = (result.metadata.confidence ?? 0.9);
+      const newLayer: Layer = {
+        id: `delineated-${Date.now()}`,
+        name: `${selectedRaster.name} - Boundaries`,
+        type: 'vector',
+        data: result.boundaries,
+        visible: true,
+        color: '#ef4444', // Red for delineated layers
+        description: `Generated ${result.metadata.fieldCount} field boundaries (${result.metadata.processingTime}ms, ${(confidence * 100).toFixed(1)}% confidence)`,
+        features: featureMetadata
+      };
 
-        // Update bbox status to completed
-        setBoundingBoxes(prev => prev.map(b =>
-          b.id === boundingBox.id ? { ...b, status: 'completed' as const, layerId: newLayer.id } : b
-        ));
+      setLayers(prev => [newLayer, ...prev]);
+      alert(`✅ Successfully generated ${result.metadata.fieldCount} field boundaries!`);
 
-      } catch (error: any) {
-        console.error('Error generating boundaries:', error);
-        setBoundingBoxes(prev => prev.map(b =>
-          b.id === boundingBox.id ? {
-            ...b,
-            status: 'error' as const,
-            error: error.message || 'Failed to generate boundaries'
-          } : b
-        ));
-      }
+    } catch (error: any) {
+      console.error('Error generating boundaries:', error);
+      alert(`❌ Error: ${error.message || 'Failed to generate boundaries'}`);
+    } finally {
+      setIsGenerating(false);
     }
-
-    setIsGenerating(false);
   };
 
 
@@ -183,13 +152,46 @@ export default function Home() {
     if (file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff')) {
       try {
         const geotiff = await import('geotiff');
+        const proj4 = await import('proj4');
         const arrayBuffer = await file.arrayBuffer();
         const tiff = await geotiff.fromArrayBuffer(arrayBuffer);
         const image = await tiff.getImage();
         const width = image.getWidth();
         const height = image.getHeight();
         const bboxCoords = image.getBoundingBox(); // [minX, minY, maxX, maxY]
+        const geoKeys = image.getGeoKeys();
         const samplesPerPixel = image.getSamplesPerPixel();
+        
+        // Get CRS information
+        let finalBounds = bboxCoords;
+        let crsDescription = 'Unknown CRS';
+        
+        // Check if we need to reproject to EPSG:4326
+        const epsgCode = geoKeys?.ProjectedCSTypeGeoKey || geoKeys?.GeographicTypeGeoKey;
+        
+        if (epsgCode && epsgCode !== 4326) {
+          // Not WGS84, need to reproject bounds
+          console.log(`Reprojecting from EPSG:${epsgCode} to EPSG:4326`);
+          crsDescription = `EPSG:${epsgCode}`;
+          
+          try {
+            const fromProj = `EPSG:${epsgCode}`;
+            const toProj = 'EPSG:4326';
+            
+            // Reproject corner points
+            const [minX, minY, maxX, maxY] = bboxCoords;
+            const [minLon, minLat] = proj4.default(fromProj, toProj, [minX, minY]);
+            const [maxLon, maxLat] = proj4.default(fromProj, toProj, [maxX, maxY]);
+            
+            finalBounds = [minLon, minLat, maxLon, maxLat];
+            console.log(`Reprojected bounds: ${finalBounds}`);
+          } catch (err) {
+            console.error('Reprojection failed:', err);
+            alert(`Warning: Could not reproject coordinates from EPSG:${epsgCode} to WGS84. Results may be inaccurate.`);
+          }
+        } else {
+          crsDescription = 'EPSG:4326 (WGS84)';
+        }
         
         // Read rasters as separate bands (not interleaved)
         const rasters = await image.readRasters();
@@ -212,9 +214,9 @@ export default function Home() {
         const isFloat = band0 instanceof Float32Array || band0 instanceof Float64Array;
 
         for (let i = 0; i < width * height; i++) {
-          const r = band0[i];
-          const g = band1 ? band1[i] : r;
-          const b = band2 ? band2[i] : r;
+          const r = (band0 as any)[i];
+          const g = band1 ? (band1 as any)[i] : r;
+          const b = band2 ? (band2 as any)[i] : r;
           
           data[i * 4 + 0] = isFloat ? Math.max(0, Math.min(255, Math.round((r || 0) * 255))) : (r || 0);
           data[i * 4 + 1] = isFloat ? Math.max(0, Math.min(255, Math.round((g || 0) * 255))) : (g || 0);
@@ -230,9 +232,9 @@ export default function Home() {
           type: 'raster',
           visible: true,
           color: '#10b981',
-          description: `Raster layer (${width}x${height})`,
+          description: `Raster layer (${width}x${height}, ${crsDescription})`,
           rasterUrl,
-          rasterBounds: [[bboxCoords[1], bboxCoords[0]], [bboxCoords[3], bboxCoords[2]]]
+          rasterBounds: [[finalBounds[1], finalBounds[0]], [finalBounds[3], finalBounds[2]]]
         };
         setLayers(prev => [newLayer, ...prev]);
       } catch (err: any) {
@@ -370,6 +372,7 @@ export default function Home() {
             onFeatureClick={handleFeatureClick}
             onReorderLayers={handleReorderLayers}
             onGenerateBoundaries={handleGenerateBoundaries}
+            isGenerating={isGenerating}
             width={sidebarWidth}
           />
           {/* Resize Handle */}
@@ -389,10 +392,9 @@ export default function Home() {
             <MapWrapper
               layers={layers}
               selectedFeatureBounds={selectedFeatureBounds}
-              drawingMode={drawingMode}
-              onBoundingBoxCreated={handleBoundingBoxCreated}
-              boundingBoxes={boundingBoxes}
-              baseLayer={baseLayer}
+              drawingMode="none"
+              onBoundingBoxCreated={() => {}}
+              boundingBoxes={[]}
             />
           )}
           {/* Map controls overlay (top right, with base layers) */}
@@ -420,20 +422,6 @@ export default function Home() {
                 (No Map)
               </label>
             </div>
-          </div>
-        </div>
-
-        {/* Drawing Controls - fixed right panel */}
-        <div className="fixed top-0 right-0 h-full w-96 z-[2000] flex flex-col items-end pointer-events-none">
-          <div className="mt-8 mr-8 pointer-events-auto">
-            <DrawingControls
-              drawingMode={drawingMode}
-              onToggleDrawing={handleToggleDrawing}
-              onGenerateBoundaries={handleGenerateBoundaries}
-              boundingBoxes={boundingBoxes}
-              onDeleteBoundingBox={handleDeleteBoundingBox}
-              isGenerating={isGenerating}
-            />
           </div>
         </div>
 

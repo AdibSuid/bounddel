@@ -1,0 +1,52 @@
+# Node modules
+node_modules
+frontend/node_modules
+frontend/.next
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+backend/__pycache__
+
+# Environment files
+.env
+.env.local
+.env*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Test files
+test_*.py
+*_test.py
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+/tmp
+
+# Data files
+data/
+*.tif
+*.tiff
+*.gpkg
+*.geojson
